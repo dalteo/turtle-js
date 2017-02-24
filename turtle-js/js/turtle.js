@@ -81,8 +81,8 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
 }
 
 
-Assembler.prototype.error = function(msg){
-   console.error("ERROR Assembler :",msg);
+Assembler.prototype.error = function(line_no, msg){
+   console.error("ERROR Assembler :", line_no, " ", msg);
 };
 
 
@@ -353,7 +353,7 @@ Assembler.prototype.jb = function(line_no, args){
 
 Assembler.prototype.sub = function(line_no, args){
    if(args.length != 2){
-      this.error(line_no, "Incorrect number of operands");
+      this.error(line_no, "Incorrect number of operands" + args);
    }
    
    var a = this.getValue(line_no,args[0]);
@@ -504,41 +504,51 @@ Assembler.prototype.run = function() {
 
 Assembler.prototype.dispatch = function(line_no, operation){
    var op = operation[0];
+   var args = operation.slice(1);
+   var _args = []
+   for (var i = 0; i < args.length; ++i) {
+       if(args[i] == "") {
+            continue;
+       }
+       _args.push(args[i]);
+   }
+   args = _args;
+   console.log(args);
    if (op === "") {
        // do nothing
    }
    else if(op === "mov"){
-      this.mov(line_no,operation.slice(1));
+      this.mov(line_no,args);
    }else if(op === "jmp"){
-      this.jmp(line_no,operation.slice(1));
+      this.jmp(line_no,args);
    }else if(op === "cmp"){
-      this.cmp(line_no,operation.slice(1));
+      this.cmp(line_no,args);
    }else if(op === "je"){
-      this.je(line_no,operation.slice(1));
+      this.je(line_no,args);
    }else if(op === "jne"){
-      this.jne(line_no,operation.slice(1));
+      this.jne(line_no,args);
    }else if(op === "ja"){
-      this.ja(line_no,operation.slice(1));
+      this.ja(line_no,args);
    }else if(op === "jb"){
-      this.jb(line_no,operation.slice(1));
+      this.jb(line_no,args);
    }else if(op === "add"){
-      this.add(line_no,operation.slice(1));
+      this.add(line_no,args);
    }else if(op === "sub"){
-      this.sub(line_no,operation.slice(1));
+      this.sub(line_no,args);
    }else if(op === "mul"){
-      this.mul(line_no,operation.slice(1));
+      this.mul(line_no,args);
    }else if(op === "div"){
-      this.div(line_no,operation.slice(1));
+      this.div(line_no,args);
    }else if(op === "prn"){
-      this.prn(line_no,operation.slice(1));
+      this.prn(line_no,args);
    }else if(op === "pen"){
-      this.pen(line_no,operation.slice(1));
+      this.pen(line_no,args);
    }else if(op === "pos"){
-      this.pos(line_no,operation.slice(1));
+      this.pos(line_no,args);
    }else if(op === "rot"){
-      this.rot(line_no,operation.slice(1));
+      this.rot(line_no,args);
    }else if(op === "fwd"){
-      this.fwd(line_no,operation.slice(1));
+      this.fwd(line_no,args);
    }else{
       this.error(line_no, "Incorrect syntax");
    }
