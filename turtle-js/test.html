@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Turtle</title>
+<style type="text/css">
+
+.box {
+    border: 1px solid black;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+    overflow: hidden;
+}
+
+div {
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+}
+
+.flex-row {
+    display: flex;
+    flex-direction: row;
+}
+
+.flex-col {
+    display: flex;
+    flex-direction: column;
+}
+
+#top {
+    height: 64.5%;
+}
+
+#bottom {
+    height: 34.5%;
+}
+
+#top > div {
+    display: inline-block;
+}
+
+#bottom > div {
+    display: inline-block;
+}
+
+#tleft {
+    width: 40%;
+}
+
+#tcenter {
+    width: 40%;
+}
+
+#tright {
+    width: 19%;
+}
+
+#bleft {
+    width: 20%;
+}
+
+#bcenter {
+    width: 20%;
+}
+
+#bright {
+    width: 59%;
+}
+
+
+</style>
+
+<script src="js/jquery-3.1.1.js" type="text/javascript"></script>
+<script src="js/turtle.js" type="text/javascript"></script>
+<script src="https://ace.c9.io/build/src/ace.js" type="text/javascript" charset="utf-8"></script>
+<script src="https://ace.c9.io/build/src/mode-assembly_x86.js" type="text/javascript" charset="utf-8"></script>
+<script src="https://ace.c9.io/build/src/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
+</head>
+<body>
+    <div id="root" class="">
+        <div id="top" class="box">
+            <div id="tleft" class="box">
+                <table id="table_editor">
+                    <th>
+                    <div id="editor" width="500px" height="500px">.global main
+
+                    main:
+                        pen $1
+                        fwd $50
+                        rot $90
+                        fwd $50
+                        rot $90
+	                    fwd $50
+                        rot $90
+                        fwd $50
+                        rot $90
+
+                    </div>
+                    </th>
+                </table>
+            </div>
+            <div id="tcenter" class="box">Top Center</div>
+            <div id="tright" class="box">Top Right</div>
+        </div>
+        <div id="bottom" class="box">
+            <div id="bleft" class="box">Bottom Left</div>
+            <div id="bcenter" class="box">Bottom Center</div>
+            <div id="bright" class="box">Bottom Right</div>
+        </div>
+    </div>
+    
+    <script>
+        var as;
+		var editor;
+        $( document ).ready(function() {
+            editor = ace.edit("editor");
+            //editor.setTheme("ace/theme/monokai");
+            //editor.getSession().setMode("ace/mode/assembly_x86");
+            editor.setHighlightActiveLine(true);
+            var canvas = document.getElementById("as_canvas");
+            var frames = document.getElementById("frames");
+            var registers = document.getElementById("registers");
+            var jump_table = document.getElementById("jump_table");
+            var memory = document.getElementById("memory");
+            as = new Assembler(canvas, registers, jump_table, memory, frames);
+            
+            editor.commands.addCommand({
+                name: 'save',
+                bindKey: {win: 'Ctrl-S',  mac: 'Command-S'},
+                exec: function(editor) {
+                    console.log('save');
+                    as.setSource(editor.getValue());
+                }
+            });
+            editor.commands.addCommand({
+                name: 'run',
+                bindKey: {win: 'Ctrl-B',  mac: 'Command-B'},
+                exec: function(editor) {
+                    as.setSource(editor.getValue());
+                    as.run();
+                }
+            });
+            
+        });
+        
+        var doStep = function() {
+			if (!as.code) {
+				as.setSource(editor.getValue());
+			}
+			as.step(true);
+		};
+	
+    </script>
+</body>
+</html> 

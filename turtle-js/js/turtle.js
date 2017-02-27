@@ -1,4 +1,4 @@
-function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
+function Assembler(canvas,registers_view,jump_table_view,memory_view,frames_view,test_mode){
    this.test_mode = (test_mode === undefined) ? false : test_mode;
    this.kValue = 0;
    this.kEqual = 1;
@@ -10,6 +10,7 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
    this.registers_view = registers_view;
    this.jump_table_view = jump_table_view;
    this.memory_view = memory_view;
+   this.frames_view = frames_view;
    this.ctx = this.drawer();
    this.line_no = null;
    
@@ -182,19 +183,15 @@ Assembler.prototype.fwd = function(line_no,args){
    
    var distance = this.getValue(line_no,args[0])[this.kValue];
    distance = parseFloat(distance);
-   console.log("angle " + this.gAngle, 'distance ', distance);
    var direction = [
       distance * Math.cos(this.gAngle), 
       distance * Math.sin(this.gAngle)
    ];
    
-   console.log('direction ', direction);
-   console.log('gLastPos ', this.gLastPos);
    var position = [
       this.gLastPos[0] + direction[0],
       this.gLastPos[1] + direction[1]
    ];
-   console.log('position ', position);
    this.setPosition(position);
 };
 
@@ -207,7 +204,6 @@ Assembler.prototype.rot = function(line_no, args){
    var angle = this.getValue(line_no,args[0])[this.kValue];
    
    this.gAngle += ((parseFloat(angle)/180.0) * Math.PI);
-   console.log('rot ', this.gAngle);
    this.registers["cpr"][this.kValue] = parseInt((this.gAngle / Math.PI) * 180.0);
 };
 
@@ -272,7 +268,7 @@ Assembler.prototype.jmp = function(line_no,args){
 };
 
 
-Assembler.prototype.op_cmp = function(line_no,args){
+Assembler.prototype.cmp = function(line_no,args){
    if(args.length != 2){
       this.error(line_no, "Incorrect number of operands");
    }
@@ -299,12 +295,17 @@ Assembler.prototype.je = function(line_no, args){
    
    if(this.registers["eflags"][this.kValue] === this.kEqual){
       var label = args[0];
-      var next_line = this.jmp_table.get(label,null);
-      if(next_line !== null){
-         this.next_line = next_line;
-      }else{
-         this.error(line_no, "Invalid label given");
-      }
+      
+      if(label.startswith("*")){
+          line_no[this.kValue] = this.getValue(line_no,label.slice(1))[this.kValue];
+       }else{
+          var next_line = this.jmp_table.get(label,null);
+          if(next_line !== null){
+		     this.next_line = next_line;
+          }else{
+             this.error(line_no, "Invalid label given: " + label);
+          }
+       }
    }
 };
 
@@ -317,12 +318,16 @@ Assembler.prototype.jne = function(line_no,args){
    if(this.registers["eflags"][this.kValue] === this.kGreaterThan || 
       this.registers["eflags"][this.kValue] === this.kLessThan){
       var label = args[0];
-      var next_line = this.jmp_table.get(label,null);
-      if(next_line !== null){
-         this.next_line = next_line;
-      }else{
-         this.error(line_no, "Invalid label given");
-      }
+      if(label.startswith("*")){
+          line_no[this.kValue] = this.getValue(line_no,label.slice(1))[this.kValue];
+       }else{
+          var next_line = this.jmp_table.get(label,null);
+          if(next_line !== null){
+		     this.next_line = next_line;
+          }else{
+             this.error(line_no, "Invalid label given: " + label);
+          }
+       }
    }
 };
 
@@ -334,12 +339,16 @@ Assembler.prototype.ja = function(line_no, args){
    
    if(this.registers["eflags"][this.kValue] === this.kGreaterThan){
       var label = args[0];
-      var next_line = this.jmp_table.get(label,null);
-      if(next_line !== null){
-         this.next_line = next_line;
-      }else{
-         this.error(line_no, "Invalid label given");
-      }
+      if(label.startswith("*")){
+          line_no[this.kValue] = this.getValue(line_no,label.slice(1))[this.kValue];
+       }else{
+          var next_line = this.jmp_table.get(label,null);
+          if(next_line !== null){
+		     this.next_line = next_line;
+          }else{
+             this.error(line_no, "Invalid label given: " + label);
+          }
+       }
    }
 };
 
@@ -351,12 +360,16 @@ Assembler.prototype.jb = function(line_no, args){
    
    if(this.registers["eflags"][this.kValue] === this.kLessThan){
       var label = args[0];
-      var next_line = this.jmp_table.get(label,null);
-      if(next_line !== null){
-         this.next_line = next_line;
-      }else{
-         this.error(line_no, "Invalid label given");
-      }
+      if(label.startswith("*")){
+          line_no[this.kValue] = this.getValue(line_no,label.slice(1))[this.kValue];
+       }else{
+          var next_line = this.jmp_table.get(label,null);
+          if(next_line !== null){
+		     this.next_line = next_line;
+          }else{
+             this.error(line_no, "Invalid label given: " + label);
+          }
+       }
    }
 };
 
@@ -444,6 +457,25 @@ Assembler.prototype.setSource = function(src) {
     this.lines = this.code.split("\n");
     this.reset();
 	
+	for(var i=0 ; i < this.lines.length ; i++){
+      var line_no = i;
+      var line = this.lines[i];
+      line = line.replace("\t"," ").replace("\n", "").replace(",", " ");
+      
+      // strip out comments
+      var comment = line.search("#");
+      if(comment !== -1){
+         line = line.slice(0,comment);
+      }
+      
+      if(line.endswith(":")){
+         var operation = line.replace(" ", "");
+         var label = operation.split(":")[0];
+         this.jmp_table[label] = line_no;
+      }
+   }
+	
+	var frames_view_str = "<table><tr><th><strong>Frames</strong></th></tr>\n";
 	while(!this.end_reached) {
 		this._step();
 		var frame = {
@@ -454,16 +486,27 @@ Assembler.prototype.setSource = function(src) {
 			current_line: this.current_line
 		};
 		this.frames.push(frame);
+		frames_view_str += '<tr><td><a onclick="as.stepFrame(' + this.frames.length + ');">' + this.lines[this.current_line] + "</a></td></tr>";
 	}
+	
+	this.frames_view.innerHTML = frames_view_str;
 };
 
 Assembler.prototype.getCurrentFrame = function() {
     return this.frames[this.current_frame];
 };
 
+Assembler.prototype.stepFrame = function(frame) {
+    this.current_frame = frame;
+    this.update_current_frame(true);
+}
+
 Assembler.prototype.step = function(once) {
 	this.current_frame++;
-	
+    this.update_current_frame(once);
+};
+
+Assembler.prototype.update_current_frame = function(once) {
 	var frame = this.getCurrentFrame();
 	
 	// update canvas
@@ -537,7 +580,6 @@ Assembler.prototype._step = function(once) {
 		this.end_reached = true;
         return;
     }
-    console.log(line);
     
     line = line.replace("\t"," ").replace("\n", "").replace(",", " ");
       
@@ -547,11 +589,6 @@ Assembler.prototype._step = function(once) {
      line = line.slice(0,comment);
     }
 
-    if(line.endswith(":")){
-        var operation = line.replace(" ", "");
-        var label = operation.split(":")[0];
-        this.jmp_table[label] = this.current_line;
-    }
     if(!line.endswith(":") && !line.startswith(".")){
         operation = line.trim().split(" ");
         this.dispatch(this.current_line, operation)
@@ -574,8 +611,6 @@ Assembler.prototype.dispatch = function(line_no, operation){
        _args.push(args[i]);
    }
    args = _args;
-   console.log(op);
-   console.log(args);
    
    if (op === "") {
        // do nothing
@@ -613,7 +648,7 @@ Assembler.prototype.dispatch = function(line_no, operation){
    }else if(op === "fwd"){
       this.fwd(line_no,args);
    }else{
-      this.error(line_no, "Incorrect syntax");
+      this.error(line_no, "Incorrect syntax: " + operation);
    }
 };
 
