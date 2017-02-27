@@ -78,6 +78,10 @@ div {
     width: 59%;
 }
 
+#canvas {
+    backgound-color: blue;
+}
+
 
 </style>
 
@@ -91,26 +95,23 @@ div {
     <div id="root" class="">
         <div id="top" class="box">
             <div id="tleft" class="box">
-                <table id="table_editor">
-                    <th>
-                    <div id="editor" width="500px" height="500px">.global main
+                <div id="editor" width="500px" height="500px">.global main
+main:
+    pen $1
+    fwd $50
+    rot $90
+    fwd $50
+    rot $90
+    fwd $50
+    rot $90
+    fwd $50
+    rot $90
 
-                    main:
-                        pen $1
-                        fwd $50
-                        rot $90
-                        fwd $50
-                        rot $90
-	                    fwd $50
-                        rot $90
-                        fwd $50
-                        rot $90
-
-                    </div>
-                    </th>
-                </table>
+                </div>
             </div>
-            <div id="tcenter" class="box">Top Center</div>
+            <div id="tcenter" class="box">
+                <canvas id="canvas" width="100%" height="100%"></canvas>
+            </div>
             <div id="tright" class="box">Top Right</div>
         </div>
         <div id="bottom" class="box">
@@ -125,33 +126,8 @@ div {
 		var editor;
         $( document ).ready(function() {
             editor = ace.edit("editor");
-            //editor.setTheme("ace/theme/monokai");
-            //editor.getSession().setMode("ace/mode/assembly_x86");
-            editor.setHighlightActiveLine(true);
-            var canvas = document.getElementById("as_canvas");
-            var frames = document.getElementById("frames");
-            var registers = document.getElementById("registers");
-            var jump_table = document.getElementById("jump_table");
-            var memory = document.getElementById("memory");
-            as = new Assembler(canvas, registers, jump_table, memory, frames);
-            
-            editor.commands.addCommand({
-                name: 'save',
-                bindKey: {win: 'Ctrl-S',  mac: 'Command-S'},
-                exec: function(editor) {
-                    console.log('save');
-                    as.setSource(editor.getValue());
-                }
-            });
-            editor.commands.addCommand({
-                name: 'run',
-                bindKey: {win: 'Ctrl-B',  mac: 'Command-B'},
-                exec: function(editor) {
-                    as.setSource(editor.getValue());
-                    as.run();
-                }
-            });
-            
+            editor.setTheme("ace/theme/monokai");
+            editor.getSession().setMode("ace/mode/assembly_x86");
         });
         
         var doStep = function() {
