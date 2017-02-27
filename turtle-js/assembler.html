@@ -17,16 +17,18 @@
 <table id="table_editor">
 <th>
 <div id="editor" style="height: 500px; width: 500px">.global main
+
 main:
     pen $1
     fwd $50
     rot $90
     fwd $50
     rot $90
-    fwd $50
+	fwd $50
     rot $90
     fwd $50
     rot $90
+
 </div>
 </th>
 </table>
@@ -39,17 +41,17 @@ main:
     
     <script>
         var as;
+		var editor;
         $( document ).ready(function() {
-            var editor = ace.edit("editor");
+            editor = ace.edit("editor");
             editor.setTheme("ace/theme/monokai");
             editor.getSession().setMode("ace/mode/assembly_x86");
-            //editor.setHighlightActiveLine(true);
+            editor.setHighlightActiveLine(true);
             var canvas = document.getElementById("as_canvas");
             var registers = document.getElementById("registers");
             var jump_table = document.getElementById("jump_table");
             var memory = document.getElementById("memory");
             as = new Assembler(canvas, registers, jump_table, memory);
-            //as.interpret(editor.getValue())
             
             editor.commands.addCommand({
                 name: 'save',
@@ -63,7 +65,6 @@ main:
                 name: 'run',
                 bindKey: {win: 'Ctrl-B',  mac: 'Command-B'},
                 exec: function(editor) {
-                    console.log('run');
                     as.setSource(editor.getValue());
                     as.run();
                 }
@@ -71,10 +72,16 @@ main:
             
         });
         
-        
+        var doStep = function() {
+			if (!as.code) {
+				as.setSource(editor.getValue());
+			}
+			as.step(true);
+		};
+	
     </script>
     
-    <button type="button" onclick="as.step(true);">Step</button><br>
+    <button type="button" onclick="doStep();">Step</button><br>
     <div id="registers"></div>
     <div id="jump_table"></div>
     <div id="memory"></div>

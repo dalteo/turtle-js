@@ -14,8 +14,11 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
    this.line_no = null;
    
    this.current_line = 0;
+   this.next_line = undefined;
    this.code = "";
    this.lines = [];
+   
+   this.draw_list = [];
    
    // ------------------------------------------
    // Jump table
@@ -24,6 +27,9 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
    // Memory
    this.mem_size = 256;
    this.memory = new Array(this.mem_size);
+   this.memory[256] = 255;
+   
+   this.frames = [];
    
    // Registers
    this.registers = {
@@ -55,6 +61,7 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
    
    // implement startswith method like in python 
    String.prototype.startswith = function(txt){
+	  return this.startsWith(txt);
       if(this[0] === txt){
          return true;
       }else {
@@ -64,6 +71,7 @@ function Assembler(canvas,registers_view,jump_table_view,memory_view,test_mode){
    
    // implement endswith method like in python 
    String.prototype.endswith = function(txt){
+	  return this.endsWith(txt);
       if(this.slice(-1) === txt){
          return true;
       }else {
@@ -99,13 +107,12 @@ Assembler.prototype.getValue = function(line_no, arg, setting){
       }
       return value;
    
-   
    // Memory address
-   } else if(arg.startswith("%") && arg.endswith(")")){
-      name = arg.slice(1,-1);
+   } else if(arg.startswith("(%") && arg.endswith(")")){
+      name = arg.slice(2,-1);
       var addr = this.registers.get(name,null);
-      if(addr === null){
-         this.error(line_no, "Accessing invalid memory address", addr);
+      if(this.memory[addr] === undefined){
+         this.memory[addr] = [null];//this.error(line_no, "Accessing invalid memory address", addr);
       }
       value = this.memory[addr];
       return value;
@@ -126,7 +133,7 @@ Assembler.prototype.getValue = function(line_no, arg, setting){
    
    // Incorrect syntax
    } else {
-      this.error(line_no, "The given operand is not accessible");
+      this.error(line_no, "The given operand is not accessible: " + arg);
    }
 };
 
@@ -139,10 +146,13 @@ Assembler.prototype.setValue = function(line_no, arg, value){
 
 Assembler.prototype.setPosition = function(position){
    if(this.gPenDown){
-      this.ctx.lineTo(position[0], position[1]);
-      this.ctx.stroke();
+	  this.draw_list.push({method: 'line_to', start: position[0], end: position[1]});
+	  this.draw_list.push({method: 'stroke'});
+      //this.ctx.lineTo(position[0], position[1]);
+      //this.ctx.stroke();
    }else{
-      this.ctx.moveTo(position[0], position[1]);
+	  this.draw_list.push({method: 'move_to', start: position[0], end: position[1]});
+      //this.ctx.moveTo(position[0], position[1]);
    }
    
    this.gLastPos[0] = position[0];
@@ -254,9 +264,9 @@ Assembler.prototype.jmp = function(line_no,args){
    }else{
       var next_line = this.jmp_table.get(label,null);
       if(next_line !== null){
-         line_no[this.kValue] = next_line;
+		 this.next_line = next_line;
       }else{
-         this.error(line_no, "Invalid label given");
+         this.error(line_no, "Invalid label given: " + label);
       }
    }
 };
@@ -291,7 +301,7 @@ Assembler.prototype.je = function(line_no, args){
       var label = args[0];
       var next_line = this.jmp_table.get(label,null);
       if(next_line !== null){
-         line_no[this.kValue] = next_line;
+         this.next_line = next_line;
       }else{
          this.error(line_no, "Invalid label given");
       }
@@ -309,7 +319,7 @@ Assembler.prototype.jne = function(line_no,args){
       var label = args[0];
       var next_line = this.jmp_table.get(label,null);
       if(next_line !== null){
-         line_no[this.kValue] = next_line;
+         this.next_line = next_line;
       }else{
          this.error(line_no, "Invalid label given");
       }
@@ -326,7 +336,7 @@ Assembler.prototype.ja = function(line_no, args){
       var label = args[0];
       var next_line = this.jmp_table.get(label,null);
       if(next_line !== null){
-         line_no[this.kValue] = next_line;
+         this.next_line = next_line;
       }else{
          this.error(line_no, "Invalid label given");
       }
@@ -343,7 +353,7 @@ Assembler.prototype.jb = function(line_no, args){
       var label = args[0];
       var next_line = this.jmp_table.get(label,null);
       if(next_line !== null){
-         line_no[this.kValue] = next_line;
+         this.next_line = next_line;
       }else{
          this.error(line_no, "Invalid label given");
       }
@@ -406,8 +416,11 @@ Assembler.prototype.prn = function(line_no, args){
     if(args.length != 1){
       this.error(line_no, "Incorrect number of operands");
    }
-   
-   console.log(this.getValue(line_no,args[0])[this.kValue]);
+   if((args[0].startsWith('"') && args[0].endsWith('"')) || (args[0].startsWith("'") && args[0].endsWith("'"))){
+	   console.log(args[0]);
+   } else {
+	console.log(this.getValue(line_no,args[0])[this.kValue]);
+   }
 };
 
 Assembler.prototype.reset = function() {
@@ -419,6 +432,10 @@ Assembler.prototype.reset = function() {
     this.gAngle = 0.0;
     this.gPenDown = false;
     this.ctx.moveTo(this.gLastPos[0], this.gLastPos[0]);
+	this.end_reached = false;
+	this.draw_list = [];
+	this.frames = []
+	this.current_frame = -1;
     
 };
 
@@ -426,12 +443,98 @@ Assembler.prototype.setSource = function(src) {
     this.code = src;
     this.lines = this.code.split("\n");
     this.reset();
+	
+	while(!this.end_reached) {
+		this._step();
+		var frame = {
+			jmp_table: JSON.parse(JSON.stringify(this.jmp_table)),
+			registers: JSON.parse(JSON.stringify(this.registers)),
+			memory: JSON.parse(JSON.stringify(this.memory)),
+			draw_list: JSON.parse(JSON.stringify(this.draw_list)),
+			current_line: this.current_line
+		};
+		this.frames.push(frame);
+	}
+};
+
+Assembler.prototype.getCurrentFrame = function() {
+    return this.frames[this.current_frame];
 };
 
 Assembler.prototype.step = function(once) {
-    this.current_line++;
+	this.current_frame++;
+	
+	var frame = this.getCurrentFrame();
+	
+	// update canvas
+	this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.ctx.restore();
+	for(var i = 0; i < frame.draw_list.length; ++i) {
+		var draw = frame.draw_list[i];
+		if(draw.method == 'line_to') {
+			this.ctx.lineTo(draw.start, draw.end);
+		} else if(draw.method == 'move_to') {
+			this.ctx.moveTo(draw.start, draw.end);
+		} else if(draw.method == 'stroke') {
+			this.ctx.stroke();
+		}
+		
+	}
+	
+	var jump_table_str = '<table id="jump_table"><tr><th><strong>Jump Table</strong></th></tr>\n';
+    
+    for(var key in this.getCurrentFrame().jmp_table)  {
+        if (this.getCurrentFrame().jmp_table[key] === this.getCurrentFrame().jmp_table.__proto__[key]) {
+            continue;
+        }
+        jump_table_str += "<tr><td>" + key + "</td><td>" + this.getCurrentFrame().jmp_table[key] + "</td></tr>\n";
+    }
+    jump_table_str += "</table>"
+    
+    var registers_str = '<table id="registers_table"><tr><th><strong>Registers</strong></th></tr>\n';
+    
+    for(var key in this.getCurrentFrame().registers)  {
+        if (this.getCurrentFrame().registers[key] === this.getCurrentFrame().registers.__proto__[key]) {
+            continue;
+        }
+        registers_str += "<tr><td>" + key + "</td><td>" + this.getCurrentFrame().registers[key] + "</td></tr>\n";
+    }
+    
+    registers_str += "</table>"
+    
+    var memory_str = '<table id="memory_table"><th><strong>Memory</strong></th>';
+    for(var i = this.getCurrentFrame().memory.length - 1; i >= 0; i--)  {
+        if (this.getCurrentFrame().memory[i] === undefined) {
+            continue;
+        }
+        memory_str += "<tr><td>" + i + "</td><td>" + this.getCurrentFrame().memory[i] + "</td></tr>\n";
+    }
+    
+    memory_str += "</table>"
+
+    
+    this.jump_table_view.innerHTML = jump_table_str;//JSON.stringify(this.jmp_table, null, 4);
+    this.registers_view.innerHTML = registers_str;//JSON.stringify(this.registers, null, 4);
+    this.memory_view.innerHTML = memory_str;//JSON.stringify(this.memory, null, 4);
+	
+	if(once === undefined) {
+        setInterval(this.step.bind(this), 500);
+    }
+};
+
+Assembler.prototype._step = function(once) {
+	if (this.next_line !== undefined) {
+		this.current_line = this.next_line;
+		this.next_line = undefined;
+	}
+	else {
+		this.current_line++;
+	}
+	
     line = this.lines[this.current_line];
     if(line === undefined) {
+		this.end_reached = true;
         return;
     }
     console.log(line);
@@ -453,48 +556,6 @@ Assembler.prototype.step = function(once) {
         operation = line.trim().split(" ");
         this.dispatch(this.current_line, operation)
     }
-    
-    var jump_table_str = '<table id="jump_table"><tr><th><strong>Jump Table</strong></th></tr>\n';
-    
-    
-    for(var key in this.jmp_table)  {
-        if (this.jmp_table[key] === this.jmp_table.__proto__[key]) {
-            continue;
-        }
-        jump_table_str += "<tr><td>" + key + "</td><td>" + this.jmp_table[key] + "</td></tr>\n";
-    }
-    jump_table_str += "</table>"
-    
-    var registers_str = '<table id="registers_table"><tr><th><strong>Registers</strong></th></tr>\n';
-    
-    for(var key in this.registers)  {
-        if (this.registers[key] === this.registers.__proto__[key]) {
-            continue;
-        }
-        registers_str += "<tr><td>" + key + "</td><td>" + this.registers[key] + "</td></tr>\n";
-    }
-    
-    registers_str += "</table>"
-    
-    var memory_str = '<table id="memory_table"><th><strong>Memory</strong></th>';
-    console.log(this.memory);
-    for(var i = 0; i < this.memory.length; i++)  {
-        if (this.memory[i] === undefined) {
-            continue;
-        }
-        memory_str += "<tr><td>" + i + "</td><td>" + this.memory[i] + "</td></tr>\n";
-    }
-    
-    memory_str += "</table>"
-
-    
-    this.jump_table_view.innerHTML = jump_table_str;//JSON.stringify(this.jmp_table, null, 4);
-    this.registers_view.innerHTML = registers_str;//JSON.stringify(this.registers, null, 4);
-    this.memory_view.innerHTML = memory_str;//JSON.stringify(this.memory, null, 4);
-    
-    if(once === undefined) {
-        setInterval(this.step.bind(this), 500);
-    }
 };
 
 Assembler.prototype.run = function() {
@@ -513,7 +574,9 @@ Assembler.prototype.dispatch = function(line_no, operation){
        _args.push(args[i]);
    }
    args = _args;
+   console.log(op);
    console.log(args);
+   
    if (op === "") {
        // do nothing
    }
@@ -553,7 +616,6 @@ Assembler.prototype.dispatch = function(line_no, operation){
       this.error(line_no, "Incorrect syntax");
    }
 };
-
 
 Assembler.prototype.interpret = function(txt){
    // clear the canvas first
